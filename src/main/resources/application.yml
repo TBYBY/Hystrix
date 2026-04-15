@@ -1,0 +1,5 @@
+#全局熔断参数配置
+hystrix:
+  alertErrorRate: 0.3
+  circuitErrorRate: 0.5
+  windowTime: 1

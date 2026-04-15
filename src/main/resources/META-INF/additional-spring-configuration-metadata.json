@@ -1,0 +1,18 @@
+{
+  "properties": [
+    {
+      "name": "hystrix.alertErrorRate",
+      "type": "java.lang.Double",
+      "description": "Description for hystrix.alertErrorRate."
+    },
+    {
+      "name": "hystrix.circuitErrorRate",
+      "type": "java.lang.Double",
+      "description": "Description for hystrix.circuitErrorRate."
+    },
+    {
+      "name": "hystrix.windowTime",
+      "type": "java.lang.Integer",
+      "description": "Description for hystrix.windowTime."
+    }
+  ] }
