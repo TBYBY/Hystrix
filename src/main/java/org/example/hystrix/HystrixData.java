@@ -10,6 +10,6 @@ public class HystrixData {
     private final LongAdder errorCount = new LongAdder();
 
     public Double getErrorRate(){
-        long total =
+        return null;
     }
 }
