@@ -3,3 +3,4 @@ hystrix:
   alertErrorRate: 0.3
   circuitErrorRate: 0.5
   windowTime: 1
+  enable: true
