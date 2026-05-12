@@ -5,11 +5,29 @@ import java.util.concurrent.atomic.LongAdder;
 
 public class HystrixData {
     /*记录总数*/
-    private final LongAdder totalCount = new LongAdder();
+    private LongAdder totalCount = new LongAdder();
     /*记录错误请求数*/
-    private final LongAdder errorCount = new LongAdder();
+    private LongAdder errorCount = new LongAdder();
 
     public Double getErrorRate(){
-        return null;
+        long total_count = totalCount.sum();
+        long bad_count = errorCount.sum();
+        return (double) bad_count / total_count;
+    }
+
+    public void addTotalCount() {
+        totalCount.increment();
+    }
+
+    public void addErrorCount(){
+        errorCount.increment();
+    }
+
+    public long getTotalCount(){
+        return totalCount.sum();
+    }
+
+    public long getErrorCount(){
+        return errorCount.sum();
     }
 }

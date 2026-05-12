@@ -1,6 +1,5 @@
 package org.example.hystrix;
 
-
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -8,5 +7,19 @@ import java.util.concurrent.ConcurrentHashMap;
  * 接口名，接口熔断数值对象
  */
 public class TimeWindow {
-    private final ConcurrentHashMap<String, HystrixData> hystrixDataMap = new ConcurrentHashMap<>();
+    /* 记录当前所有接口的数据 */
+    private ConcurrentHashMap<String, HystrixData> hystrixDataMap;
+
+    public ConcurrentHashMap<String, HystrixData> getMap(){
+        return hystrixDataMap;
+    }
+
+    public void setMap(ConcurrentHashMap<String, HystrixData> map){
+        this.hystrixDataMap = map;
+    }
+
+    public TimeWindow(){
+        this.hystrixDataMap = new ConcurrentHashMap<>();
+    }
+
 }

@@ -14,8 +14,10 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class HystrixConfig {
 
+    private static final int WindowSize = 10;
+
     @Bean
-    public HystrixStorage hystrixStorage(){
-        return new HystrixStorage();
+    public HystrixStorage hystrixStorage(int windowSize){
+        return new HystrixStorage(windowSize);
     }
 }
