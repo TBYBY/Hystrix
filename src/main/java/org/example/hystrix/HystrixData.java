@@ -30,4 +30,13 @@ public class HystrixData {
     public long getErrorCount(){
         return errorCount.sum();
     }
+
+    public void setTotalCount(LongAdder count){
+        totalCount = count;
+    }
+
+
+    public void setErrorCount(LongAdder count){
+        errorCount = count;
+    }
 }

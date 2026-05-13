@@ -1,8 +1,8 @@
 package org.example.hystrix;
 
-import java.util.Timer;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.LongAdder;
 
 /**
  * 负责存储接口的熔断状态, 接口的熔断数值
@@ -23,7 +23,9 @@ public class HystrixStorage {
     /* 设置窗口默认大小*/
     private static final int windowSize = 10;
     /* 配置时间计算窗口起点 */
-    private volatile long firstTime;
+    private volatile long firstTimeMs;
+    /* 默认接口熔断时间 */
+    private long windowDurationMs = 1000L * 60;
 
     /* 熔断窗口数组初始化 */
     public HystrixStorage(int windowSize) {
@@ -31,13 +33,13 @@ public class HystrixStorage {
         for(int i = 0; i < windowSize; i++){
             timeWindows[i] = new TimeWindow();
         }
-        this.firstTime = System.currentTimeMillis();
+        this.firstTimeMs = System.currentTimeMillis();
     }
 
     /* 获取当前时间窗口 */
     public int getWindowPoint(){
         long nowTime = System.currentTimeMillis();
-        long minutes = TimeUnit.MILLISECONDS.toMinutes(nowTime - firstTime);
+        long minutes = TimeUnit.MILLISECONDS.toMinutes(nowTime - firstTimeMs);
         return (int) minutes % windowSize;
     }
 
@@ -89,8 +91,74 @@ public class HystrixStorage {
         return (double) error / total;
     }
 
+    /* 获取接口熔断状态
+    * 1.若 map.get(key) 为null: 返回 false
+    * 2.若 map.get(key) 非空: 1. 当前时间 - 熔断开始时间 < 熔断时间: 返回 true
+    *                        2. 当前时间 - 熔断开始时间 > 熔断时间: 熔断已过，重置时间窗口内所有档期啊接口的熔断数值。
+    *                           删除 key, 返回 false
+    *  */
+    public boolean isHystrix(String key, int windowSize){
+        Long hystrixTime = isHystrixMap.get(key);
+        long nowTime = System.currentTimeMillis();
+        if(hystrixTime == null){
+            return false;
+        }else if(nowTime - hystrixTime < windowDurationMs * windowSize){
+            return true;
+        }else{
+            isHystrixMap.remove(key);
+            resetTimeWindow(key, windowSize);
+            return false;
+        }
+    }
 
+    /* 设置接口状态为熔断
+    *  当第一次设置熔断时，同步进行日志打印
+    */
+    public boolean setHystrix(String key){
+        long startTime = System.currentTimeMillis();
+        if (isHystrixMap.containsKey(key)){
+            return false;
+        }
+        Long result = isHystrixMap.putIfAbsent(key, startTime);
+        return result == null;
+    }
+
+    /*
+     * 当接口脱离熔断窗口时，将原本的历史数据进行 reset
+     */
+    public void resetTimeWindow(String key, int windowSize){
+        int point = getWindowPoint();
+        while(windowSize > 0){
+            TimeWindow timeWindow = timeWindows[point];
+            if(timeWindow != null){
+                HystrixData data = timeWindow.getMap().get(key);
+                if(data != null){
+                    data.setTotalCount(new LongAdder());
+                    data.setErrorCount(new LongAdder());
+                }
+            }
+            point--;
+            windowSize--;
+            if(point < 0){
+                point = timeWindows.length - 1;
+            }
+        }
+    }
+
+    /* 判断是否需要告警, 如果首次设置告警，需要打印日志 */
+    public boolean setAlert(String key, int windowSize){
+        Long value = isAlertMap.get(key);
+        long nowTime = System.currentTimeMillis();
+        if(value == null){
+            isAlertMap.putIfAbsent(key, nowTime);
+            return true;
+        }else if (nowTime - value < windowSize * windowDurationMs){
+            return false;
+        }
+        return false;
+    }
 
 
 
 }
+
