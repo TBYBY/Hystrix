@@ -2,7 +2,6 @@ package org.example.hystrix;
 
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.LongAdder;
 
 /**
  * 负责存储接口的熔断状态, 接口的熔断数值
@@ -12,7 +11,6 @@ import java.util.concurrent.atomic.LongAdder;
  * 使用 数组记录 当前时间下 所有接口的熔断数值
  */
 
-
 public class HystrixStorage {
     /* 记录当前接口熔断状态 */
     private final ConcurrentHashMap<String, Long> isHystrixMap = new ConcurrentHashMap<>();
@@ -20,8 +18,8 @@ public class HystrixStorage {
     private final ConcurrentHashMap<String, Long> isAlertMap = new ConcurrentHashMap<>();
     /* 记录当前接口的熔断数据*/
     private final TimeWindow[] timeWindows;
-    /* 设置窗口默认大小*/
-    private static final int windowSize = 10;
+    /* 最小统计窗口大小*/
+    private static final int timeWindowsLength = 2;
     /* 配置时间计算窗口起点 */
     private volatile long firstTimeMs;
     /* 默认接口熔断时间 */
@@ -39,13 +37,28 @@ public class HystrixStorage {
     /* 获取当前时间窗口 */
     public int getWindowPoint(){
         long nowTime = System.currentTimeMillis();
+        if(nowTime - firstTimeMs < 0){
+            resetStartTime();
+            nowTime = System.currentTimeMillis();
+        }
         long minutes = TimeUnit.MILLISECONDS.toMinutes(nowTime - firstTimeMs);
-        return (int) minutes % windowSize;
+        return (int) minutes % timeWindows.length;
     }
 
+    /* 重新设置开始时间 */
+    public synchronized void resetStartTime(){
+        if(System.currentTimeMillis() < firstTimeMs){
+            firstTimeMs = System.currentTimeMillis();
+            int curSizeLength = timeWindows.length - 1;
+            while(curSizeLength >= 0){
+                timeWindows[curSizeLength] = new TimeWindow();
+                curSizeLength--;
+            }
+        }
+    }
 
     /* 新增成功请求 */
-    public boolean markSuccess(String key){
+    public boolean markTotal(String key){
         int point = getWindowPoint();
         TimeWindow timeWindow = timeWindows[point];
         if(timeWindow == null) {
@@ -131,11 +144,8 @@ public class HystrixStorage {
             if(timeWindow != null){
                 timeWindow.getMap().put(key, new HystrixData());
             }
-            point--;
+            point = (point + timeWindows.length - 1) % timeWindows.length;
             windowSize--;
-            if(point < 0){
-                point = timeWindows.length - 1;
-            }
         }
     }
 
@@ -148,8 +158,10 @@ public class HystrixStorage {
             return true;
         }else if (nowTime - value < windowSize * windowDurationMs){
             return false;
+        }else{
+            isAlertMap.remove(key);
+            return true;
         }
-        return false;
     }
 }
 

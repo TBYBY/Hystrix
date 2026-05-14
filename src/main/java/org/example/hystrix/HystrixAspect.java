@@ -10,7 +10,13 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.HttpServerErrorException;
+
+import java.io.IOException;
 import java.lang.reflect.Method;
+import java.net.ConnectException;
+import java.util.Set;
+import java.util.concurrent.TimeoutException;
 
 @Component
 @Aspect
@@ -39,30 +45,33 @@ public class HystrixAspect {
         String serviceName = hystrix.name();
         Object result = null;
         if(hystrixStorage.isHystrix(serviceName, hystrix.windowTime())){
-
+            throw new Exception("接口处于熔断状态");
         }
         Long startTime = System.currentTimeMillis();
         try{
             result = joinPoint.proceed();
         }catch (Throwable e){
-            boolean status = hystrixStorage.markFailure(serviceName);
-            if(!status){
-                // TODO: 记录熔断容器出错日志
+            try{
+                if(isErrorException(e)){
+                    hystrixStorage.markFailure(serviceName);
+                    evaluateCircuitBreaker(serviceName, hystrix);
+                }
+            }catch (Throwable throwable){
+                logger.info("熔断窗口出现错误");
+
             }
-            evaluateCircuitBreaker(serviceName, hystrix);
             throw e;
         }
-        if(hystrix.TimeOut() == 1){
-            Long nowTime = System.currentTimeMillis();
-            if(nowTime - startTime >= hystrix.Time()){
-                boolean status = hystrixStorage.markFailure(serviceName);
-                if(!status){
-                    //TODO:
-                }
-                evaluateCircuitBreaker(serviceName, hystrix);
+        Long nowTime = System.currentTimeMillis();
+        try {
+            if (hystrix.TimeOut() == 1 && nowTime - startTime >= hystrix.Time()) {
+                hystrixStorage.markFailure(serviceName);
+            } else {
+                hystrixStorage.markTotal(serviceName);
             }
-            hystrixStorage.markSuccess(serviceName);
             evaluateCircuitBreaker(serviceName, hystrix);
+        }catch (Exception e){
+            logger.info("熔断器问题");
         }
         return result;
     }
@@ -85,5 +94,16 @@ public class HystrixAspect {
                 logger.info(("isHystrix"));
             }
         }
+    }
+
+    public boolean isErrorException(Throwable e){
+        Set<Class<?>> IGNORED_EXCEPTIONS = Set.of(TimeoutException.class, IOException.class, ConnectException.class,
+                HttpServerErrorException.class);
+        for(Class<?> clz: IGNORED_EXCEPTIONS){
+            if(clz.isInstance(e)){
+                return true;
+            }
+        }
+        return false;
     }
 }
