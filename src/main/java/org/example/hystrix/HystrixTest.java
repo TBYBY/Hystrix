@@ -18,4 +18,5 @@ public @interface HystrixTest {
     int windowTime() default 1; //时间窗口
     TimeUnit UNIT() default TimeUnit.MINUTES; // 定义时间单位为分钟
     int TimeOut() default 0; //是否判断接口超时
+    int Time() default 0; //接口超时时间阈值
 }

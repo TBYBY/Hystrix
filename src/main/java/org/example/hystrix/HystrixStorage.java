@@ -25,7 +25,7 @@ public class HystrixStorage {
     /* 配置时间计算窗口起点 */
     private volatile long firstTimeMs;
     /* 默认接口熔断时间 */
-    private long windowDurationMs = 1000L * 60;
+    private final long windowDurationMs = 1000L * 60;
 
     /* 熔断窗口数组初始化 */
     public HystrixStorage(int windowSize) {
@@ -42,6 +42,7 @@ public class HystrixStorage {
         long minutes = TimeUnit.MILLISECONDS.toMinutes(nowTime - firstTimeMs);
         return (int) minutes % windowSize;
     }
+
 
     /* 新增成功请求 */
     public boolean markSuccess(String key){
@@ -68,8 +69,8 @@ public class HystrixStorage {
         return true;
     }
 
-    /* 获取接口失败率 */
-    public double getFailureRate(String key, int windowSize){
+    /* 获取窗口内接口数值 */
+    public HystrixDataSnap getHystrixDataSnap(String key, int windowSize){
         int point = getWindowPoint();
         long total = 0;
         long error = 0;
@@ -81,14 +82,11 @@ public class HystrixStorage {
                     total += data.getTotalCount();
                     error += data.getErrorCount();
                 }
-                point--;
-                if(point < 0){
-                    point = timeWindows.length - 1;
-                }
-                windowSize--;
             }
+            point = (point + timeWindows.length - 1) % timeWindows.length;
+            windowSize--;
         }
-        return (double) error / total;
+        return new HystrixDataSnap(total, error);
     }
 
     /* 获取接口熔断状态
@@ -131,11 +129,7 @@ public class HystrixStorage {
         while(windowSize > 0){
             TimeWindow timeWindow = timeWindows[point];
             if(timeWindow != null){
-                HystrixData data = timeWindow.getMap().get(key);
-                if(data != null){
-                    data.setTotalCount(new LongAdder());
-                    data.setErrorCount(new LongAdder());
-                }
+                timeWindow.getMap().put(key, new HystrixData());
             }
             point--;
             windowSize--;
@@ -157,8 +151,5 @@ public class HystrixStorage {
         }
         return false;
     }
-
-
-
 }
 
